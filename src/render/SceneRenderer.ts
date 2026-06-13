@@ -945,11 +945,15 @@ function makeLeaderboardTexture(entries: LeaderboardEntry[], trackName: string):
   context.lineWidth = 16;
   context.strokeRect(30, 30, canvas.width - 60, canvas.height - 60);
 
+  const title = entries.length === 1 && entries[0].name.toLowerCase().includes("pb")
+    ? "CURRENT PB"
+    : "MODEL BENCHMARKS";
+
   context.fillStyle = "#f5c542";
   context.font = "900 118px Arial";
   context.textAlign = "left";
   context.textBaseline = "alphabetic";
-  context.fillText("MODEL BENCHMARKS", 110, 175);
+  context.fillText(title, 110, 175);
 
   context.fillStyle = "#9eabb4";
   context.font = "700 46px Arial";

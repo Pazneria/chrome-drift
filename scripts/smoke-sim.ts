@@ -4,7 +4,9 @@ import { Track } from "../src/game/Track";
 import type { InputSnapshot } from "../src/input/InputManager";
 
 const trackArg = process.argv.find((arg) => arg.startsWith("--track="));
+const driverArg = process.argv.find((arg) => arg.startsWith("--driver="));
 const track = new Track(trackArg?.slice("--track=".length));
+const driver = driverArg?.slice("--driver=".length) ?? "codex";
 const car = new Car();
 let telemetry: CarTelemetry = {
   speedMps: 0,
@@ -44,7 +46,7 @@ const checkpointMsList: number[] = [];
 let checkpointIndex = 0;
 
 for (let step = 0; step < 120 * 180; step += 1) {
-  const input = getAutopilotInput(neutralInput, car, track, telemetry);
+  const input = getAutopilotInput(neutralInput, car, track, telemetry, driver);
   telemetry = car.update(input, track, dt, true);
   timeMs += dt * 1000;
   const contact = car.getContact(track);
@@ -62,6 +64,7 @@ for (let step = 0; step < 120 * 180; step += 1) {
         {
           ok: true,
           trackId: track.id,
+          driver,
           finishMs: Math.round(timeMs),
           checkpointMs: checkpointMs == null ? null : Math.round(checkpointMs),
           checkpointMsList: checkpointMsList.map((splitMs) => Math.round(splitMs)),
@@ -84,6 +87,7 @@ console.error(
     {
       ok: false,
       trackId: track.id,
+      driver,
       timeMs: Math.round(timeMs),
       checkpointMs: checkpointMs == null ? null : Math.round(checkpointMs),
       checkpointMsList: checkpointMsList.map((splitMs) => Math.round(splitMs)),
