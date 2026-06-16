@@ -6,6 +6,7 @@ import { InputManager } from "./input/InputManager";
 import { Car, type CarSnapshot, type CarTelemetry } from "./game/Car";
 import { CODEX_GHOST_NAME, createCodexGhostRecording } from "./game/CodexGhost";
 import { getAutopilotInput } from "./game/Autopilot";
+import { getAutoplayReplayTimeMs, getBillboardEntriesForTrack } from "./game/PbReplay";
 import {
   loadBestRun,
   loadSettings,
@@ -34,27 +35,14 @@ class RaceGptApp {
   private readonly ui: UI;
   private readonly urlParams = new URLSearchParams(window.location.search);
   private readonly autoplay = this.urlParams.has("autoplay");
+  private readonly autopilotVariant = this.urlParams.get("driver") ?? "codex";
   private readonly muted = this.urlParams.has("muted");
 
   private settings: GameSettings = loadSettings();
   private bestRun: GhostRecording | null = null;
   private mode: GameMode = "menu";
   private settingsReturnMode: GameMode = "menu";
-  private telemetry: CarTelemetry = {
-    speedMps: 0,
-    speedKmh: 0,
-    verticalSpeedMps: 0,
-    driftAmount: 0,
-    slipAmount: 0,
-    onRoad: true,
-    airborne: false,
-    barrierHit: false,
-    engineLoad: 0,
-    steerInput: 0,
-    gear: 1,
-    rpmNormalized: 0.24,
-    shiftPulse: 0
-  };
+  private telemetry: CarTelemetry = initialTelemetry();
 
   private lastFrame = performance.now();
   private accumulator = 0;
@@ -93,13 +81,11 @@ class RaceGptApp {
     }
     this.bestRun = loadBestRun(this.track.id);
     this.codexGhost = createCodexGhostRecording(this.track);
-    this.renderer = new SceneRenderer(canvas, this.track, [
-      {
-        rank: 1,
-        name: CODEX_GHOST_NAME,
-        timeMs: this.codexGhost.timeMs
-      }
-    ]);
+    this.renderer = new SceneRenderer(
+      canvas,
+      this.track,
+      getBillboardEntriesForTrack(this.track.id, CODEX_GHOST_NAME, this.codexGhost.timeMs)
+    );
     this.ui = new UI({
       startRun: () => this.startRunFromGesture(),
       resume: () => this.resumeFromPause(),
@@ -154,6 +140,7 @@ class RaceGptApp {
     this.currentRecording = [];
     this.recordAccumulator = 0;
     this.car.resetTo(this.track.startPose, 0);
+    this.telemetry = initialTelemetry();
     this.lastTrackS = this.track.startS;
     this.ui.showGame();
     this.ui.setCountdown("3");
@@ -348,7 +335,9 @@ class RaceGptApp {
 
     if (this.mode === "countdown") {
       this.updateCountdown(dt);
-      this.telemetry = this.car.update(input, this.track, dt, false);
+      if (this.mode === "countdown") {
+        this.telemetry = this.car.update(input, this.track, dt, false);
+      }
       return;
     }
 
@@ -380,6 +369,9 @@ class RaceGptApp {
     }
 
     if (this.countdownRemaining <= 0) {
+      this.car.resetTo(this.track.startPose, 0);
+      this.telemetry = initialTelemetry();
+      this.lastTrackS = this.track.startS;
       this.mode = "running";
       this.ui.setCountdown("GO");
       this.goFlashRemaining = 0.45;
@@ -520,6 +512,14 @@ class RaceGptApp {
     beatenModelDelta: number | null
   ): string {
     if (!isPlayerRun) {
+      const replayTimeMs = getAutoplayReplayTimeMs(
+        this.track.id,
+        this.autopilotVariant,
+        this.autoplay
+      );
+      if (replayTimeMs != null) {
+        return `PB replay complete. Time: ${formatTime(replayTimeMs)}.`;
+      }
       return `${CODEX_GHOST_NAME} replay complete. Benchmark time: ${formatTime(this.codexGhost.timeMs)}.`;
     }
 
@@ -604,7 +604,7 @@ class RaceGptApp {
   private getAutopilotInput(base: InputSnapshot): InputSnapshot {
     if (this.mode !== "running" && this.mode !== "countdown") return base;
 
-    return getAutopilotInput(base, this.car, this.track, this.telemetry);
+    return getAutopilotInput(base, this.car, this.track, this.telemetry, this.autopilotVariant);
   }
 
   private publishDebugState(): void {
@@ -655,6 +655,24 @@ function cloneSnapshot(snapshot: CarSnapshot): CarSnapshot {
     gear: snapshot.gear,
     rpmNormalized: snapshot.rpmNormalized,
     airborne: snapshot.airborne
+  };
+}
+
+function initialTelemetry(): CarTelemetry {
+  return {
+    speedMps: 0,
+    speedKmh: 0,
+    verticalSpeedMps: 0,
+    driftAmount: 0,
+    slipAmount: 0,
+    onRoad: true,
+    airborne: false,
+    barrierHit: false,
+    engineLoad: 0,
+    steerInput: 0,
+    gear: 1,
+    rpmNormalized: 0.24,
+    shiftPulse: 0
   };
 }
 
