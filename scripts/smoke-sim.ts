@@ -43,6 +43,7 @@ let timeMs = 0;
 let lastS = track.startS;
 let checkpointMs: number | null = null;
 const checkpointMsList: number[] = [];
+const checkpointLateralList: number[] = [];
 let checkpointIndex = 0;
 
 for (let step = 0; step < 120 * 180; step += 1) {
@@ -52,13 +53,23 @@ for (let step = 0; step < 120 * 180; step += 1) {
   const contact = car.getContact(track);
 
   const nextCheckpointS = track.checkpointSs[checkpointIndex];
-  if (nextCheckpointS != null && lastS < nextCheckpointS && contact.s >= nextCheckpointS) {
+  if (
+    nextCheckpointS != null &&
+    lastS < nextCheckpointS &&
+    contact.s >= nextCheckpointS &&
+    contact.absLateral <= track.roadWidth / 2 + 1.1
+  ) {
     checkpointMs = timeMs;
     checkpointMsList[checkpointIndex] = timeMs;
+    checkpointLateralList[checkpointIndex] = contact.lateral;
     checkpointIndex += 1;
   }
 
-  if (lastS < track.finishS && contact.s >= track.finishS) {
+  if (
+    lastS < track.finishS &&
+    contact.s >= track.finishS &&
+    contact.absLateral <= track.roadWidth / 2 + 1.4
+  ) {
     console.log(
       JSON.stringify(
         {
@@ -68,6 +79,8 @@ for (let step = 0; step < 120 * 180; step += 1) {
           finishMs: Math.round(timeMs),
           checkpointMs: checkpointMs == null ? null : Math.round(checkpointMs),
           checkpointMsList: checkpointMsList.map((splitMs) => Math.round(splitMs)),
+          checkpointLateralList: checkpointLateralList.map((lateral) => Number(lateral.toFixed(3))),
+          finishLateral: Number(contact.lateral.toFixed(3)),
           speedKmh: Math.round(telemetry.speedKmh),
           trackS: Math.round(contact.s)
         },
@@ -91,6 +104,7 @@ console.error(
       timeMs: Math.round(timeMs),
       checkpointMs: checkpointMs == null ? null : Math.round(checkpointMs),
       checkpointMsList: checkpointMsList.map((splitMs) => Math.round(splitMs)),
+      checkpointLateralList: checkpointLateralList.map((lateral) => Number(lateral.toFixed(3))),
       speedKmh: Math.round(telemetry.speedKmh),
       trackS: Math.round(contact.s),
       finishS: Math.round(track.finishS),
